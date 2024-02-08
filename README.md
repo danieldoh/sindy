@@ -1,0 +1,2 @@
+# sindy
+Sindy calculation GUI
