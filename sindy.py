@@ -19,21 +19,21 @@ def create_plt_folder():
     os.makedirs(folder_path, exist_ok=True)
 
 
-def distribution(data, variable_list, folder_path):
+def distribution(data_f, variable_list, folder_path):
     # Histogram before log transformation
 
     for i, variable in enumerate(variable_list):
         plt.figure(i)
         fig, axs = plt.subplots(2, 2, figsize=(16, 8))
-        axs[0, 0].hist(data[variable], bins=30, edgecolor='black')
+        axs[0, 0].hist(data_f[variable], bins=30, edgecolor='black')
         axs[0, 0].set_xlabel(variable)
         axs[0, 0].set_ylabel("Frequency")
         axs[0, 0].set_title("Histogram of Original data")
 
         # Normal distribution before log transformation
-        mean_b = data[variable].mean()
-        std_b = data[variable].std()
-        x1 = np.linspace(data[variable].min(), data[variable].max(), 100)
+        mean_b = data_f[variable].mean()
+        std_b = data_f[variable].std()
+        x1 = np.linspace(data_f[variable].min(), data_f[variable].max(), 100)
         y1 = (1 / (std_b * np.sqrt(2 * np.pi))) * np.exp(-0.5 * ((x1 - mean_b) / std_b) ** 2)
         axs[0, 1].plot(x1, y1, color='blue')
         axs[0, 1].set_xlabel(variable)
@@ -41,15 +41,15 @@ def distribution(data, variable_list, folder_path):
         axs[0, 1].set_title('Normal Distribution of Original Data')
 
         # Histogram after log transformation
-        data[variable] = data[variable].apply(np.log1p)
-        axs[1, 0].hist(data[variable], bins=30, edgecolor='black')
+        data_f[variable] = data_f[variable].apply(np.log1p)
+        axs[1, 0].hist(data_f[variable], bins=30, edgecolor='black')
         axs[1, 0].set_xlabel(variable)
         axs[1, 0].set_ylabel("Frequency")
         axs[1, 0].set_title("Histogram after Log Transformation")
 
-        mean_a = data[variable].mean()
-        std_a = data[variable].std()
-        x2 = np.linspace(data[variable].min(), data[variable].max(), 100)
+        mean_a = data_f[variable].mean()
+        std_a = data_f[variable].std()
+        x2 = np.linspace(data_f[variable].min(), data_f[variable].max(), 100)
         y2 = (1 / (std_a * np.sqrt(2 * np.pi))) * np.exp(-0.5 * ((x2 - mean_a) / std_a) ** 2)
         axs[1, 1].plot(x2, y2, color='blue')
         axs[1, 1].set_xlabel(variable)
@@ -115,6 +115,7 @@ def polynomialorder(inputdata, target, ordernum, folder_path):
         ksi = library_inverse.values@target.values
         ksi = pd.DataFrame(ksi)
         result = lib.values@ksi.values
+        print(target)
         ms = sklearn.metrics.mean_squared_error(target, result)
         mse.append(ms)
         n = len(inputdata)
@@ -261,13 +262,16 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='sindy argparse')
     parser.add_argument('--file_path', help='insert csv file path')
+    parser.add_argument('--folder_path', help='insert saving folder path')
     args = parser.parse_args()
 
     data = get_data(args.file_path)
+    data_dist = data.copy()
 
     variable_list = data.columns.tolist()
-    #print(variable_list)
-    #distribution(data, variable_list)
+    print(variable_list)
+    distribution(data_dist, variable_list, args.folder_path)
+    print(data)
 
     log_transformation_check = input("Want to apply log [y/n]: ")
     if log_transformation_check == "y" or log_transformation_check == "Y":
@@ -300,19 +304,19 @@ if __name__ == "__main__":
         want_to_drop = input("Wnat to drop more columns [y/n]: ")
 
     ordernum = int(input("Write the order number (suggestion=6): "))
-    polynomialorder(input_data, target, ordernum)
+    polynomialorder(input_data, target, ordernum, args.folder_path)
 
     order = int(input("Write the proper order number: "))
     start = int(input("Write the start number: "))
     end = int(input("Write the end number: "))
 
-    thresholdvalue(input_data, target, order, start, end)
+    thresholdvalue(input_data, target, order, start, end, args.folder_path)
 
     want_to_get_result = input("Want to get result [y/n]: ")
     lamb = float(input("Write the initial threshold value: "))
 
     while want_to_get_result == "y" or want_to_get_result == "Y":
-        result(input_data, target, order, lamb)
+        result(input_data, target, order, lamb, args.folder_path)
         want_to_get_result = input("Want to get more result [y/n]: ")
 
         if (want_to_get_result != "y" and want_to_get_result != "Y"):
