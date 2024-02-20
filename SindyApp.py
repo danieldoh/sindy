@@ -402,7 +402,7 @@ class MainWindow(QWidget):
             #layout = self.layout()
 
     def run_distribution(self, data, variable_list, folder_path):
-        distribution(data, variable_list, folder_path)
+        distribution(data.copy(), variable_list, folder_path)
         self.plot.setText(f"Distribution plots are saved. ({self.folder_path})")
 
     def apply_log(self, input_data):

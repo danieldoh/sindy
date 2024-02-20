@@ -64,11 +64,11 @@ def log_transformation(data):
 	return(data)
 
 def standardization(data):
-    scaler = StandardScaler()
+    #scaler = StandardScaler()
     cols = data.columns
     for col in cols:
-        data[[col]] = scaler.fit_transform(data[[col]])
-    return(data)
+        data[[col]] = (data[[col]] - np.mean(data[[col]]))/np.std(data[[col]])
+    return data
 
 #이건 뒤에 마지막 3개 함수에 사용되기만 하고 직접 사용자한테 보여줄(?) 필요는 없는 함수야~~~~~~~~~~~
 
@@ -109,14 +109,18 @@ def polynomialorder(inputdata, target, ordernum, folder_path):
     mse = []
     order = []
     term = []
+    print("1", target)
     for i in range(1,ordernum+1):
         lib = get_polynomial_combinations(inputdata, i)
         library_inverse = pd.DataFrame(np.linalg.pinv(lib))
         ksi = library_inverse.values@target.values
         ksi = pd.DataFrame(ksi)
         result = lib.values@ksi.values
-        print(target)
-        ms = sklearn.metrics.mean_squared_error(target, result)
+        print("2result", result)
+        print("2", target)
+        #ms = sklearn.metrics.mean_squared_error(target, result)
+        error = result - target
+        ms = np.mean(error ** 2)
         mse.append(ms)
         n = len(inputdata)
         K = sum((ksi != 0).sum())
