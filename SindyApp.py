@@ -1,9 +1,10 @@
 import os
 import sys
 import datetime
-from sindy import distribution, get_data, log_transformation, standardization, polynomialorder, thresholdvalue, result
-from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QFileDialog, QVBoxLayout, QLabel, QTextEdit, QInputDialog, QDialog, QTableWidgetItem, QTableWidget, QLineEdit, QHBoxLayout, QGridLayout, QSizePolicy
+from sindy import distribution, get_data, log_transformation, standardization, polynomialorder, thresholdvalue, result, visualization, calculate_env_data
+from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QFileDialog, QVBoxLayout, QLabel, QTextEdit, QInputDialog, QDialog, QTableWidgetItem, QTableWidget, QLineEdit, QHBoxLayout, QGridLayout, QSizePolicy, QMainWindow, QAction
 from PyQt5.QtCore import pyqtSignal, QObject, Qt
+from PyQt5.QtGui import QPixmap, QIcon
 
 class Communicate(QObject):
     selected_columns_signal = pyqtSignal(str)
@@ -15,6 +16,24 @@ class Communicate(QObject):
     result_lambda_signal = pyqtSignal(str)
 
 communicator = Communicate()
+
+class ImageWindow(QDialog):
+    def __init__(self, plot_path):
+        super(ImageWindow, self).__init__()
+        self.plot_path = plot_path
+        self.initUI()
+
+    def initUI(self):
+        self.setWindowTitle('Environmental Factor Plot')
+        #self.setGeometry(100, 100, 1500, 600)
+        layout = QVBoxLayout()
+
+        pixmap = QPixmap(self.plot_path)
+        label = QLabel()
+        label.setPixmap(pixmap)
+        layout.addWidget(label)
+
+        self.setLayout(layout)
 
 class LambdaWindow(QDialog):
     def __init__(self, parent=None):
@@ -194,7 +213,7 @@ class TargetWindow(QDialog):
 
             communicator.selected_ordernum_signal.emit(self.order)
 
-class MainWindow(QWidget):
+class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
@@ -215,75 +234,123 @@ class MainWindow(QWidget):
         self.result_lamb = None
         self.result_term = None
         self.result_expression = None
+        self.env_file_name = None
+        self.plot_path = None
 
         self.init_ui()
 
     def init_ui(self):
-        main_layout = QHBoxLayout(self)
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        self.setWindowIcon(QIcon('icon.png'))
+        exitAction = QAction(QIcon('exit.png'), 'Exit', self)
+        exitAction.setShortcut('Ctrl+Q')
+        exitAction.setStatusTip('Exit application')
+        exitAction.triggered.connect(self.exit_program)
+
+        self.toolbar = self.addToolBar('Exit')
+        self.toolbar.addAction(exitAction)
+
+        main_layout = QHBoxLayout(central_widget)
         left_layout = QVBoxLayout()
         right_layout = QVBoxLayout()
 
-        btn_select_file = QPushButton('Select .csv File', self)
+        btn_select_file = QPushButton('Select Data File', self)
+        btn_select_file.setToolTip('Choose the <b>CSV Data File</b>')
         btn_select_file.setStyleSheet('background-color: #336600; color: white;')
         btn_select_file.clicked.connect(self.show_file_dialog)
 
         self.lbl_selected_file = QLabel("Selected File: None")
+        self.lbl_selected_file.setAlignment(Qt.AlignCenter)
         self.lbl_selected_file.setWordWrap(True)
 
-        btn_folder_dir = QPushButton('Select Saving Directory', self)
+        btn_folder_dir = QPushButton('Select Saving Directory (Mandatory)', self)
+        btn_folder_dir.setToolTip('Choose the <b>Project Directory</b>')
         btn_folder_dir.setStyleSheet('background-color: #336600; color: white;')
         btn_folder_dir.clicked.connect(self.show_dir_dialog)
 
         self.lbl_selected_dir = QLabel("Saving Directory: None")
+        self.lbl_selected_dir.setAlignment(Qt.AlignCenter)
         self.lbl_selected_dir.setWordWrap(True)
 
+        btn_select_env = QPushButton('Select Environmental Factor File', self)
+        btn_select_env.setToolTip('Choose the <b>Environmental Factor File</b>')
+        btn_select_env.setStyleSheet('background-color: #006690; color: white;')
+        btn_select_env.clicked.connect(self.show_env_dialog)
+
+        self.lbl_selected_env = QLabel("Selected Env File: None")
+        self.lbl_selected_env.setAlignment(Qt.AlignCenter)
+        self.lbl_selected_env.setWordWrap(True)
+
+        self.lbl_selected_env2 = QLabel("Not Available (Select Environmental Factor File First)")
+        self.lbl_selected_env2.setAlignment(Qt.AlignCenter)
+        self.lbl_selected_env2.setWordWrap(True)
+
         self.table_widget = QTableWidget(self)
+        self.table_widget.setStyleSheet("border-style: solid;")
         self.table_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.table_widget.setMaximumSize(1200, 600)
 
-        btn_run = QPushButton('Read Data', self)
+        btn_run = QPushButton('Display Data', self)
+        btn_run.setToolTip('Click to display the data on the left')
         btn_run.setStyleSheet('background-color: #808080; color: white;')
         btn_run.clicked.connect(self.run_sindy)
 
-        btn_exit = QPushButton('Exit', self)
+        '''btn_exit = QPushButton('Exit', self)
+        btn_exit.setToolTip('Click to exit the program')
         btn_exit.clicked.connect(self.exit_program)
-        btn_exit.setStyleSheet('background-color: #808080; color: white;')
+        btn_exit.setStyleSheet('background-color: #808080; color: white;')'''
 
-        distribution_btn = QPushButton('Get Distribution', self)
+        env_btn = QPushButton('Environmental Factor', self)
+        env_btn.setToolTip('Click to see the environmental factor plot')
+        env_btn.setStyleSheet('background-color: #006690; color: white;')
+        env_btn.clicked.connect(self.env_window)
+
+        distribution_btn = QPushButton('1. Get Distribution', self)
         distribution_btn.setStyleSheet('background-color: #000099; color: white;')
         distribution_btn.clicked.connect(lambda: self.run_distribution(self.input_data, self.variable_list, self.folder_path))
 
-        log_btn = QPushButton('Log Transformation', self)
+        log_btn = QPushButton('2. Log Transformation', self)
+        log_btn.setToolTip('Click to apply <b>Log Transformation</b>')
         log_btn.setStyleSheet('background-color: #6666FF; color: white;')
         log_btn.clicked.connect(lambda: self.apply_log(self.input_data))
 
-        stand_btn = QPushButton('Standardization', self)
+        stand_btn = QPushButton('2.1. Standardization', self)
+        stand_btn.setToolTip('Click to apply <b>Standardization</b>')
         stand_btn.setStyleSheet('background-color: #6666FF; color: white;')
         stand_btn.clicked.connect(lambda: self.apply_standarization(self.input_data))
 
-        target_btn = QPushButton('Choose Target, Input data, and Order Number', self)
+        target_btn = QPushButton('3. Choose Target, Input data, and Order Number', self)
+        target_btn.setToolTip('Click to open <b>Target Option Window</b>')
         target_btn.setStyleSheet('background-color: #006666; color: white;')
         target_btn.clicked.connect(lambda: self.target_input(self.input_data))
 
-        poly_btn = QPushButton('Plot Polynomial', self)
+        poly_btn = QPushButton('3.1. Plot Polynomial', self)
+        poly_btn.setToolTip('Click to plot <b>Polynomial</b> (Make sure you did Step 3)')
         poly_btn.setStyleSheet('background-color: #006666; color: white;')
         poly_btn.clicked.connect(lambda: self.polynomial_order(self.input_data, self.target, self.order_num, self.folder_path))
 
-        thres_input_btn = QPushButton('Insert Threshold Parameter', self)
+        thres_input_btn = QPushButton('4. Insert Threshold Parameter', self)
+        thres_input_btn.setToolTip('Click to open <b>Threshold Parameter Window</b>')
         thres_input_btn.setStyleSheet('background-color: #CC6600; color: white;')
         thres_input_btn.clicked.connect(self.thres_input)
 
-        thres_btn = QPushButton('Plot Threshold', self)
+        thres_btn = QPushButton('4.1. Plot Threshold', self)
+        thres_btn.setToolTip('Click to plot <b>Threshold</b> (Make sure you did Step 4)')
         thres_btn.setStyleSheet('background-color: #CC6600; color: white;')
         thres_btn.clicked.connect(lambda: self.threshold_value(self.input_data, self.target, self.thres_order, self.start, self.end, self.folder_path))
 
-        result_input_btn = QPushButton('Insert Lambda', self)
+        result_input_btn = QPushButton('5. Insert Lambda', self)
+        result_input_btn.setToolTip('Click to open <b>Lambda Window</b>')
         result_input_btn.setStyleSheet('background-color: #990000; color: white;')
         result_input_btn.clicked.connect(self.result_input)
 
-        result_btn = QPushButton('Get Result', self)
+        result_btn = QPushButton('6. Get Result', self)
+        result_btn.setToolTip('Make sure to click this button at the end')
         result_btn.setStyleSheet('background-color: #990000; color: white;')
         result_btn.clicked.connect(lambda: self.result(self.input_data, self.target, self.thres_order, self.lamb, self.folder_path))
+
+        self.statusBar().showMessage('')
 
         self.plot = QLabel('')
         self.plot.setTextInteractionFlags(self.plot.textInteractionFlags() | Qt.TextSelectableByMouse)
@@ -308,10 +375,12 @@ class MainWindow(QWidget):
         self.result_output_expression_label.setWordWrap(True)
 
 
-        right_layout.addWidget(btn_select_file)
-        right_layout.addWidget(self.lbl_selected_file)
         right_layout.addWidget(btn_folder_dir)
         right_layout.addWidget(self.lbl_selected_dir)
+        right_layout.addWidget(btn_select_file)
+        right_layout.addWidget(self.lbl_selected_file)
+        right_layout.addWidget(btn_select_env)
+        right_layout.addWidget(self.lbl_selected_env)
         left_layout.addWidget(self.table_widget)
         right_layout.addWidget(btn_run)
         right_layout.addSpacing(10)
@@ -334,7 +403,10 @@ class MainWindow(QWidget):
         right_layout.addWidget(self.result_output_lamb_label)
         right_layout.addWidget(self.result_output_term_label)
         right_layout.addWidget(self.result_output_expression_label)
-        right_layout.addWidget(btn_exit)
+        right_layout.addWidget(self.lbl_selected_env2)
+        right_layout.addWidget(env_btn)
+        right_layout.addSpacing(10)
+        #right_layout.addWidget(btn_exit)
 
 
         main_layout.addLayout(left_layout)
@@ -342,7 +414,7 @@ class MainWindow(QWidget):
 
         self.setLayout(main_layout)
 
-        self.setGeometry(300, 300, 1700, 800)
+        self.setGeometry(300, 300, 1800, 1200)
         self.setWindowTitle('Sindy')
 
     def show_dir_dialog(self):
@@ -354,6 +426,7 @@ class MainWindow(QWidget):
         if self.folder_dir:
             print("Selected Directory:", self.folder_dir)
             self.lbl_selected_dir.setText(f"Saving Directory: {self.folder_dir}")
+            self.create_plt_folder()
 
     def create_plt_folder(self):
         current_datetime = datetime.datetime.now()
@@ -384,10 +457,29 @@ class MainWindow(QWidget):
 
         if file_name:
             print("Selected File:", file_name)
-            self.lbl_selected_file.setText(f"Selected File: {file_name}")
+            self.lbl_selected_file.setText(f"Selected Data File: {file_name}")
+
+    def show_env_dialog(self):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+
+        self.env_file_name, _ = QFileDialog.getOpenFileName(self, "Open File", "", "All Files (*);;Text Files (*.csv)", options=options)
+
+        if self.env_file_name:
+            print("Selected File:", self.env_file_name)
+            self.lbl_selected_env.setText(f"Selected Env File: {self.env_file_name}")
+            self.lbl_selected_env2.setText("Available")
+            header, in_dict, out_dict, in_cal, out_cal = calculate_env_data(self.env_file_name)
+            self.plot_path = visualization(header, in_dict, out_dict, in_cal, out_cal, self.folder_path)
+
+    def env_window(self):
+        print(self.plot_path)
+        if os.path.exists(self.plot_path):
+            imagewindow = ImageWindow(self.plot_path)
+            imagewindow.exec_()
 
     def run_sindy(self):
-        file_name = self.lbl_selected_file.text().replace("Selected File: ", "")
+        file_name = self.lbl_selected_file.text().replace("Selected Data File: ", "")
         if file_name != "None":
             print(f"Running Sindy with file: {file_name}")
 
@@ -397,13 +489,13 @@ class MainWindow(QWidget):
             print(self.input_data)
             self.variable_list = self.input_data.columns.tolist()
             print("Columns:", self.input_data.columns)
-            self.create_plt_folder()
 
             #layout = self.layout()
 
     def run_distribution(self, data, variable_list, folder_path):
         distribution(data.copy(), variable_list, folder_path)
-        self.plot.setText(f"Distribution plots are saved. ({self.folder_path})")
+        self.statusBar().showMessage(f"Distribution plots are saved. ({self.folder_path})")
+        #self.plot.setText(f"Distribution plots are saved. ({self.folder_path})")
 
     def apply_log(self, input_data):
         self.input_data = log_transformation(input_data)
@@ -421,7 +513,8 @@ class MainWindow(QWidget):
         print(self.order_num)
         polynomialorder(input_data, target, order_num, folder_path)
         print("Plotted the polynomial.")
-        self.plot.setText(f"Polynomial order plot is saved. ({self.folder_path})")
+        self.statusBar().showMessage(f"Polynomial order plot is saved. ({self.folder_path})")
+        #self.plot.setText(f"Polynomial order plot is saved. ({self.folder_path})")
 
     def result_input(self):
         lambda_window = LambdaWindow(self)
@@ -468,7 +561,8 @@ class MainWindow(QWidget):
         print(f'Order number: {order_num}, Start: {start}, End: {end}')
         thresholdvalue(input_data, target, order_num, start, end, folder_path)
         print("Plotted threshold plot.")
-        self.plot.setText(f"Threshold value plot is saved. ({self.folder_path})")
+        self.statusBar().showMessage(f"Threshold value plot is saved. ({self.folder_path})")
+        #self.plot.setText(f"Threshold value plot is saved. ({self.folder_path})")
 
     def target_input(self, data):
         target_window = TargetWindow(data, self)

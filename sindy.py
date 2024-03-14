@@ -260,14 +260,85 @@ def get_data(file_path):
     df = pd.read_csv(file_path)
     return df
 
+def visualization(header, in_dict, out_dict, in_cal, out_cal, folder_path):
+    fig, ax = plt.subplots(nrows=2, ncols=7, figsize=(15, 6))
+
+    for i, h in enumerate(header):
+        ax[0,i].plot([1, 1, 1], [in_cal[h][2], in_cal[h][1], in_cal[h][0]], color='green', linestyle='-', linewidth=4)
+        ax[0,i].scatter([1,1,1], [in_cal[h][2], in_cal[h][1], in_cal[h][0]], color='red', marker='_', s=300)
+        ax[0,i].set_title(f"{h}")
+        ax[0,i].set_xticks([])
+
+        for j, txt in enumerate(['Min', 'Max', 'Mean']):
+            ax[0,i].annotate(txt, (1, in_cal[h][2 - j]), textcoords="offset points", xytext=(-9, 1), ha='right', va='center')
+        for k, num in enumerate([str(round(in_cal[h][2],2)), str(round(in_cal[h][1],2)), str(round(in_cal[h][0], 2))]):
+            ax[0,i].annotate(num, (1, in_cal[h][2 - k]), textcoords="offset points", xytext=(9, 1), ha='left', va='center')
+
+        ax[1,i].plot([1, 1, 1], [out_cal[h][2], out_cal[h][1], out_cal[h][0]], color='blue', linestyle='-', linewidth=4)
+        ax[1,i].scatter([1,1,1], [out_cal[h][2], out_cal[h][1], out_cal[h][0]], color='red', marker='_', s=300)
+        ax[1,i].set_title(f"{h}")
+        ax[1,i].set_xticks([])
+
+        for j, txt in enumerate(['Min', 'Max', 'Mean']):
+            ax[1,i].annotate(txt, (1, out_cal[h][2 - j]), textcoords="offset points", xytext=(-9, 1), ha='right', va='center')
+        for k, num in enumerate([str(round(out_cal[h][2],2)), str(round(out_cal[h][1],2)), str(round(out_cal[h][0], 2))]):
+            ax[1,i].annotate(num, (1, out_cal[h][2 - k]), textcoords="offset points", xytext=(9, 1), ha='left', va='center')
+
+    ax[0,0].set_ylabel("Indoor", fontsize=16)
+    ax[1,0].set_ylabel("Outdoor", fontsize=16)
+
+    plt.suptitle("Environmental Factors", fontsize=25)
+    plt.tight_layout()
+    #plt.show()
+    save_path = os.path.join(folder_path, "env_factor.png")
+    plt.savefig(save_path)
+
+    return save_path
+
+def calculate_env_data(csv_file):
+    df = pd.read_csv(csv_file)
+    inout = df.iloc[:,0].values
+    in_idx = np.where(inout == "Indoor")[0]
+    out_idx = np.where(inout == "Outdoor")[0]
+
+    header = df.columns.tolist()[1:]
+    in_dict = {}
+    out_dict = {}
+
+    # [mean, max, min]
+    in_cal = {}
+    out_cal = {}
+
+    for h in header:
+        in_dict[h] = df.loc[in_idx,h].values
+        in_mean = in_dict[h].mean()
+        in_max = in_dict[h].max()
+        in_min = in_dict[h].min()
+        in_cal[h] = [in_mean, in_max, in_min]
+        out_dict[h] = df.loc[out_idx,h].values
+        out_mean = out_dict[h].mean()
+        out_max = out_dict[h].max()
+        out_min = out_dict[h].min()
+        out_cal[h] = [out_mean, out_max, out_min]
+
+    return header, in_dict, out_dict, in_cal, out_cal
+
+
 if __name__ == "__main__":
 
-    create_plt_folder()
 
     parser = argparse.ArgumentParser(description='sindy argparse')
     parser.add_argument('--file_path', help='insert csv file path')
     parser.add_argument('--folder_path', help='insert saving folder path')
+    parser.add_argument('--env_csv', '-env', help='insert env_csv')
     args = parser.parse_args()
+
+    create_plt_folder()
+
+    env_csv_check = input("Want to see the env factors [y/n]: ")
+    if env_csv_check == "y":
+        header, in_dict, out_dict, in_cal, out_cal = calculate_env_data(args.env_csv)
+        visualization(header, in_dict, out_dict, in_cal, out_cal, args.folder_path)
 
     data = get_data(args.file_path)
     data_dist = data.copy()
